@@ -1,8 +1,9 @@
 # Forza Horizon 5 — Custom HUD
 
-A lightweight overlay HUD for Forza Horizon 5 built with Tauri and Rust. Displays a real-time tachometer, speed, gear indicator, and live HP/Torque/Boost gauges by reading Forza's telemetry data output.
+A lightweight overlay HUD for Forza Horizon 5, made by making a visual mix between NFSU2 default HUD and Forza Horizon 5's HUD, built with Tauri and Rust. 
+Displays a real-time tachometer, speed, gear indicator, and live HP/Torque/Boost gauges by reading Forza's telemetry data output.
 
-![HUD Preview](preview.png)
+![HUD Preview](src-tauri/icons/Square150x150Logo.png)
 
 ## Features
 
@@ -17,7 +18,7 @@ A lightweight overlay HUD for Forza Horizon 5 built with Tauri and Rust. Display
 
 ## Download
 
-Grab the latest `.exe` from the [Releases](../../releases) page — no install required, just run it.
+Grab the latest `.exe` from the [Releases](../../releases) page — no install required, it's meant to run as a standalone app.
 
 ## Setup
 
@@ -40,6 +41,8 @@ Grab the latest `.exe` from the [Releases](../../releases) page — no install r
 | `Ctrl+R` | Force re-learn rev limiter for current car |
 | `Ctrl+Alt+R` | Quick restart the HUD |
 
+More info can be found in the Info section of the app once it's running
+
 ## Building from Source
 
 ### Prerequisites
@@ -59,12 +62,12 @@ npm run tauri build
 
 The compiled executable will be at:
 ```
-src-tauri/target/release/bundle/nsis/Forza Horizon 5 - Custom HUD_x.x.x_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Forza Horizon 5 Custom HUD - By Paburrito_x.x.x_x64-setup.exe
 ```
 
 Or the standalone exe at:
 ```
-src-tauri/target/release/Forza Horizon 5 - Custom HUD.exe
+src-tauri/target/release/Forza-Horizon-5-Custom-HUD-By-Paburrito.exe
 ```
 
 ## Tech Stack
@@ -75,8 +78,8 @@ src-tauri/target/release/Forza Horizon 5 - Custom HUD.exe
 
 ## Credits
 
-Made by **Paburrito** with way too much caffeine and genuine love for Forza Horizon 5.
+Made by me, **Paburrito** with way too much caffeine, ADHD meds and genuine love for Forza Horizon 5 and an old great that was Need For Speed Underground 2.
 
 ## License
 
-MIT — do whatever you want with it, just don't sell it.
+MIT — do whatever you want with it, just don't sell it and please give proper credits (link and all) towards this repository.
