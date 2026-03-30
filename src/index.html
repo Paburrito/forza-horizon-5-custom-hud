@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Forza Horizon 5 Custom HUD - By Paburrito</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: transparent;
+            overflow: hidden;
+        }
+
+        .tach-container {
+            position: absolute;
+            left: 65px;
+            top: 65px;
+            width: 621px;
+            height: 621px;
+        }
+
+        .tach-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        /* Text overlays */
+        .speed-text {
+            position: absolute;
+            bottom: 105px;
+            right: 0px;
+            font-size: 130px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 700;
+            font-family: Arial, sans-serif;
+        }
+
+        .speed-unit {
+            position: absolute;
+            bottom: 65px;
+            right: 25px;
+            font-size: 40px;
+            color: rgba(255, 255, 255, 0.9);
+            font-family: Arial, sans-serif;
+        }
+
+        .gear-text {
+            position: absolute;
+            top: 260px;
+            right: 5px;
+            font-size: 85px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 900;
+            font-family: Arial, sans-serif;
+        }
+
+        .gear-indicator {
+            position: absolute;
+            top: 310px;
+            right: 100px;
+            width: 0;
+            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-bottom: 40px solid white;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+
+        .gear-indicator.active {
+            opacity: 1;
+        }
+
+        /* Fonts */
+        @font-face {
+            font-family: 'ForzaFont';
+            src: url('AmsiProCond-SemiBoldItalic.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'ForzaGear';
+            src: url('AmsiProCond-BlackItalic.ttf') format('truetype');
+        }
+
+        body {
+            font-family: 'ForzaFont', Arial, sans-serif;
+        }
+
+        .gear-text,
+        .speed-text {
+            font-family: 'ForzaGear', Arial, sans-serif;
+        }
+
+        .tach-container.hidden {
+            display: none;
+        }
+
+        /* ========== TITLEBAR ========== */
+        #titlebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 35px;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 6px;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.2s;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #titlebar:hover {
+            opacity: 1;
+        }
+
+        #titlebar.always-visible {
+            opacity: 1;
+        }
+
+        #drag-handle {
+            flex: 1;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            cursor: move;
+            user-select: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tb-divider {
+            width: 1px;
+            height: 18px;
+            background: rgba(255, 255, 255, 0.15);
+            flex-shrink: 0;
+        }
+
+        .tb-group {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        #titlebar button {
+            background: rgba(255, 255, 255, 0.12);
+            border: none;
+            color: white;
+            padding: 4px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 13px;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        #titlebar button:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        #lock-btn {
+            position: relative;
+        }
+
+        #lock-btn::after {
+            content: 'Ctrl+L: Lock & Click-through';
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            margin-top: 4px;
+        }
+
+        #lock-btn:hover::after {
+            opacity: 1;
+        }
+
+        #lock-btn.locked {
+            background: rgba(234, 31, 84, 0.7);
+        }
+
+        #close-btn:hover {
+            background: rgba(255, 50, 50, 0.8);
+        }
+
+        /* ========== TUTORIAL ========== */
+        @keyframes tb-breathe {
+            0%, 100% { background: rgba(255, 255, 255, 0.12); box-shadow: none; }
+            50%       { background: rgba(234, 31, 84, 0.65);  box-shadow: 0 0 8px rgba(234, 31, 84, 0.7); }
+        }
+
+        .tb-highlight {
+            animation: tb-breathe 1.1s ease-in-out infinite !important;
+        }
+
+        .tut-hidden {
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #tutorial-panel {
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 10, 0.93);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 20px 24px;
+            max-width: 500px;
+            width: calc(100% - 40px);
+            z-index: 9998;
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        #tut-message {
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 18px;
+            line-height: 1.55;
+            margin: 0;
+            font-family: 'ForzaFont', Arial, sans-serif;
+        }
+
+        #tut-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tut-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            font-family: 'ForzaFont', Arial, sans-serif;
+            transition: background 0.2s;
+        }
+
+        .tut-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .tut-btn.primary {
+            background: rgba(234, 31, 84, 0.7);
+            border-color: rgba(234, 31, 84, 0.9);
+        }
+
+        .tut-btn.primary:hover {
+            background: rgba(234, 31, 84, 0.9);
+        }
+
+        @keyframes tut-wiggle {
+            0%,  100% { transform: translateX(-50%) rotate(0deg);  }
+            20%        { transform: translateX(-50%) rotate(-3deg); }
+            40%        { transform: translateX(-50%) rotate( 3deg); }
+            60%        { transform: translateX(-50%) rotate(-3deg); }
+            80%        { transform: translateX(-50%) rotate( 3deg); }
+        }
+
+        #tutorial-panel.tut-wiggle {
+            animation: tut-wiggle 0.6s ease-in-out;
+        }
+
+        /* ========== BUBBLE ZONE ========== */
+        .bubble-zone {
+            position: relative;
+            width: 750px;
+            height: 150px;
+            pointer-events: none;
+            margin-bottom: 10px;
+            margin-top: 20px;
+            flex-shrink: -1;
+        }
+
+        .bubble-zone * {
+            pointer-events: auto;
+        }
+
+        /* Notification bubble */
+        .notification-bubble {
+            position: absolute;
+            bottom: -80px;
+            right: 20px;
+            left: auto;
+            top: auto;
+            background: linear-gradient(135deg, #fff 0%, #d9d9d9 100%);
+            border: 2px solid #333;
+            border-radius: 15px;
+            padding: 15px 20px;
+            max-width: 400px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 9600;
+        }
+
+        .notification-bubble.show {
+            display: block;
+        }
+
+        .bubble-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        #bubble-text {
+            flex: 1;
+            color: #333;
+            font-size: 20px;
+            line-height: 1.4;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        #bubble-close {
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            flex-shrink: 0;
+        }
+
+        #bubble-close:hover {
+            color: #ea1f54;
+        }
+
+        .bubble-tail {
+            position: absolute;
+            bottom: -15px;
+            right: 60px;
+            left: auto;
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 15px solid #f0f0f0;
+        }
+
+        .bubble-tail::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: -18px;
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-top: 18px solid #333;
+        }
+
+        /* ========== HUD LAYOUT ========== */
+        .hud-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: flex-end;
+            pointer-events: none;
+            z-index: 9000;
+        }
+
+        .hud-wrapper::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 9999;
+        }
+
+        body.unlocked .hud-wrapper::before {
+            opacity: 1;
+        }
+
+        .hud-scaled-group {
+            width: 750px;
+            height: 900px;
+            /* 150 bubble-zone + 750 hud */
+            transform: scale(var(--hud-scale, 1));
+            transform-origin: bottom right;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .hud-container {
+            position: relative;
+            width: 750px;
+            height: 750px;
+            transform-origin: bottom right;
+            pointer-events: all;
+            flex-shrink: 0;
+        }
+
+        /* ========== INFO MODAL ========== */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            margin: 5% auto;
+            padding: 30px;
+            border: 2px solid rgba(234, 31, 84, 0.8);
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: white;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 10px 40px rgba(234, 31, 84, 0.4);
+        }
+
+        .modal-content h2 {
+            color: rgba(234, 31, 84, 1);
+            margin-top: 0;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .modal-content h3 {
+            color: rgba(234, 31, 84, 0.9);
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .modal-content ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .modal-content li {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+
+        .modal-content strong {
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 20px;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: rgba(234, 31, 84, 1);
+        }
+
+        .modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb {
+            background: rgba(234, 31, 84, 0.6);
+            border-radius: 10px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(234, 31, 84, 0.8);
+        }
+
+        @keyframes fadeOut {
+            0% {
+                opacity: 1;
+            }
+
+            70% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+    </style>
+</head>
+
+<body class="unlocked">
+    <!-- Titlebar -->
+    <div id="titlebar">
+        <span id="drag-handle">⋮⋮ FH5 Custom HUD - By Paburrito</span>
+        <div class="tb-group">
+            <button id="info-btn" title="Help & Info">ℹ️</button>
+        </div>
+        <div class="tb-divider"></div>
+        <div class="tb-group">
+            <button id="demo-btn" title="Toggle Demo Mode">🎮 Demo</button>
+            <button id="unit-btn" title="Toggle speed units">KM/H</button>
+        </div>
+        <div class="tb-divider"></div>
+        <div class="tb-group">
+            <button id="lock-btn" title="Lock/Unlock (Ctrl+L)">🔓</button>
+            <button id="close-btn" title="Close">✕</button>
+        </div>
+    </div>
+
+    <!-- HUD WRAPPER -->
+    <div class="hud-wrapper">
+        <div class="hud-scaled-group">
+            <!-- BUBBLE ZONE -->
+            <div class="bubble-zone">
+                <!-- Notification bubble -->
+                <div id="notification-bubble" class="notification-bubble">
+                    <div class="bubble-content">
+                        <span id="bubble-text"></span>
+                        <button id="bubble-close">✕</button>
+                    </div>
+                    <div class="bubble-tail"></div>
+                </div>
+
+            </div>
+
+            <!-- HUD CONTAINER -->
+            <div class="hud-container">
+                <div class="tach-container">
+                    <img src="Tachometer.png" class="tach-bg" width="621" height="621"
+                        style="position: absolute; top: 64.5px; left: 64.5px;">
+                    <canvas id="tachCanvas" width="750" height="750"></canvas>
+                    <div class="gear-indicator" id="gearIndicator"></div>
+                    <div class="gear-text" id="gearText">1</div>
+                    <div class="speed-text" id="speedText">0</div>
+                    <div class="speed-unit" id="speedUnit">KM/H</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tutorial Panel - must be outside hud-scaled-group to avoid transform breaking position:fixed -->
+    <div id="tutorial-panel">
+        <p id="tut-message"></p>
+        <div id="tut-buttons"></div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="info-modal" class="modal">
+        <div class="modal-content" style="font-family: ForzaFont;">
+            <span id="close-modal" class="close">&times;</span>
+            <h2>Forza Horizon 5 Custom HUD</h2>
+            <p style="justify-self: center;"><strong>By Paburrito</strong></p>
+
+            <h3>Controls and Hotkeys</h3>
+            <ul style="font-size: 18px;">
+                <li><strong>Drag titlebar</strong> - Move window</li>
+                <li><strong>Ctrl+L</strong> - Lock/unlock position & enable click-through</li>
+                <li><strong>Ctrl+S</strong> - Save custom position</li>
+                <li><strong>Ctrl+Shift+R</strong> - Restore custom position</li>
+                <li><strong>Ctrl+R</strong> - Force re-learn rev limiter for current car</li>
+                <li><strong>Ctrl+Alt+R</strong> - Quick restart the HUD</li>
+            </ul>
+
+            <h3>How to use the HUD</h3>
+            <ul>
+                <li>Just make sure that Forza Horizon 5 "Data out" is activated</li>
+                <li>Data out IP Address: 127.0.0.1</li>
+                <li>Data out IP Port: 5300</li>
+                <li>That's it! You're ready to use the HUD with the game</li>
+            </ul>
+
+            <h3>Auto-Learning Rev Limiter</h3>
+            <p>The HUD automatically learns each car's rev limiter:</p>
+            <ul>
+                <li>Bounce off the limiter for about 2-3 seconds while driving, you'll get the best readings by using at
+                    least manual transmission</li>
+                <li>Red zone will appear at the correct RPM</li>
+                <li>Learns once per session, this is so it doesn't interfere mid race</li>
+                <li>This info is stored internally, so if you switch to a previously learned car, it can recall it
+                    instantly</li>
+                <li>You can always force the HUD to re-learn your current car's rev limiter with Ctrl+R in case it
+                    doesn't match properly</li>
+            </ul>
+
+            <h3>Auto-Learning HP/TQ/Boost gauges</h3>
+            <p>Gauges adapt to your car's power output:</p>
+            <ul>
+                <li>Resets when you change cars or tunes</li>
+                <li>Learns max values as you drive</li>
+                <li>Needles move upwards when accelerating, and into the red zone when decelerating (negative HP and
+                    Torque)</li>
+            </ul>
+
+            <h3>Window Positioning</h3>
+            <ul>
+                <li>Unlock to see window boundaries (dashed border, useful for initial positioning on screen)</li>
+                <li>Auto-saves position/size when you click on the lock icon</li>
+                <li>Remembers the last size and position when re-opening the app</li>
+                <li>Can custom save / restore size and position in case you accidentally moved the HUD out of place</li>
+            </ul>
+
+            <h3>Features</h3>
+            <ul>
+                <li>Transparent overlay (OBS-compatible, just make sure to use Window Capture and Capture Method:
+                    Windows 10 (1903 and up))</li>
+                <li>When you lock the window, it becomes click-through so it doesn't interfere with the game</li>
+                <li>The app is not limited to a singular screen, so you can move this to the screen you're playing on
+                </li>
+            </ul>
+
+            <h3>Personal notes</h3>
+            <ul>
+                <li>Initially this whole thing started because I made a custom skin for GamepadViewer, then I realized I
+                    could make a HUD using Forza's telemetry export feature</li>
+                <li>After testing stuff around, I discovered I could mix my love for Forza Horizon 5 and Need for Speed:
+                    Underground 2 to make a custom HUD with both styles in mind</li>
+                <li>What you see is the result of it, and the best of all, like Todd Howard says: "It just works", only
+                    that this does it and being lightweight as well while at it</li>
+                <li>I hope you get to enjoy this HUD as much as it was fun for me while developing it</li>
+                <li>With love: Paburrito</li>
+            </ul>
+
+            <h3>Notifications too annoying? No problem!</h3>
+            <button onclick="toggleNotifications()"
+                style="background: rgba(234, 31, 84, 0.8); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px; margin-top: 10px;">
+                Toggle Notifications (Currently: <span id="notif-status">ON</span>)
+            </button>
+
+            <h3>Want to run the tutorial again?</h3>
+            <button onclick="replayTutorial()"
+                style="background: rgba(234, 31, 84, 0.8); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px; margin-top: 10px;">
+                🎓 Replay Tutorial
+            </button>
+        </div>
+    </div>
+
+    <!-- ========== MAIN GAUGES SCRIPT ========== -->
+    <script>
+        const tachCanvas = document.getElementById('tachCanvas');
+        const tachCtx = tachCanvas.getContext('2d');
+
+        // ========== CANVAS DIMENSIONS ==========
+        const CANVAS_SIZE = 750;
+        const TACH_CENTER_X = 374.5;
+        const TACH_CENTER_Y = 374.5;
+
+        // ========== COLORS ==========
+        const COLOR_WHITE_SOLID = 'rgba(255, 255, 255, 0.8)';
+        const COLOR_WHITE_SOLID_DIM = 'rgba(255, 255, 255, 0.7)';
+        const COLOR_WHITE_SOLID_DIMMER = 'rgba(255, 255, 255, 0.6)';
+        const COLOR_WHITE_NEEDLE = 'rgba(255, 255, 255, 0.9)';
+        const COLOR_WHITE_GLOW = 'rgba(255, 255, 255, 0.25)';
+        const COLOR_WHITE_GLOW_DIM = 'rgba(255, 255, 255, 0.2)';
+        const COLOR_WHITE_GLOW_END = 'rgba(255, 255, 255, 0)';
+        const COLOR_WHITE_SHADOW = 'rgba(255, 255, 255, 0.6)';
+        const COLOR_WHITE_SHADOW_DIM = 'rgba(255, 255, 255, 0.4)';
+
+        const COLOR_RED_SOLID = 'rgba(234, 31, 84, 0.9)';
+        const COLOR_RED_SOLID_DIM = 'rgba(234, 31, 84, 0.8)';
+        const COLOR_RED_SOLID_DIMMER = 'rgba(234, 31, 84, 0.7)';
+        const COLOR_RED_SOLID_DIMMEST = 'rgba(234, 31, 84, 0.6)';
+        const COLOR_RED_NEEDLE = 'rgba(234, 31, 84, 0.9)';
+        const COLOR_RED_GLOW = 'rgba(234, 31, 84, 0.25)';
+        const COLOR_RED_GLOW_DIM = 'rgba(234, 31, 84, 0.2)';
+        const COLOR_RED_GLOW_END = 'rgba(234, 31, 84, 0)';
+        const COLOR_RED_SHADOW = 'rgba(234, 31, 84, 0.6)';
+        const COLOR_RED_SHADOW_DIM = 'rgba(234, 31, 84, 0.4)';
+
+        // ========== ANGLES (DEGREES) ==========
+        const TACH_START = 90;
+        const TACH_END = 315;
+        const BOOST_HP_TQ_START_END_GAP = 45;
+        const HP_TQ_GAP = 3;
+        const TACH_MIDPOINT = TACH_START + (TACH_END - TACH_START) / 2;
+
+        const TACH_START_ANGLE = TACH_START * Math.PI / 180;
+        const TACH_END_ANGLE = TACH_END * Math.PI / 180;
+        const TACH_SWEEP = TACH_END_ANGLE - TACH_START_ANGLE;
+
+        // ========== RADII ==========
+        const THROTTLE_RADIUS = 137;
+        const RPM_OUTER_RADIUS = 295;
+        const RPM_INNER_RADIUS = 270;
+        const HP_RADIUS = 345;
+        const TQ_RADIUS = 345;
+
+        const BOOST_OUTER_RADIUS = THROTTLE_RADIUS + 5;
+        const BOOST_INNER_RADIUS = THROTTLE_RADIUS - 5;
+
+        // ========== GAUGE ANGLES ==========
+        const BOOST_MAX_ANGLE = (TACH_END - BOOST_HP_TQ_START_END_GAP) * Math.PI / 180;
+        const BOOST_MIN_ANGLE = (TACH_START + BOOST_HP_TQ_START_END_GAP) * Math.PI / 180;
+        const BOOST_SWEEP = BOOST_MAX_ANGLE - BOOST_MIN_ANGLE;
+
+        const HP_START_ANGLE = (TACH_START + BOOST_HP_TQ_START_END_GAP) * Math.PI / 180;
+        const HP_END_ANGLE = (TACH_MIDPOINT - HP_TQ_GAP / 2) * Math.PI / 180;
+        const HP_SWEEP = HP_END_ANGLE - HP_START_ANGLE;
+
+        const TQ_START_ANGLE = (TACH_MIDPOINT + HP_TQ_GAP / 2) * Math.PI / 180;
+        const TQ_END_ANGLE = (TACH_END - BOOST_HP_TQ_START_END_GAP) * Math.PI / 180;
+        const TQ_SWEEP = TQ_END_ANGLE - TQ_START_ANGLE;
+
+        // ========== SEGMENT CONFIGURATION ==========
+        const BOOST_SEGMENTS = 5;
+        const HP_SEGMENTS = 5;
+        const TQ_SEGMENTS = 5;
+
+        // ========== LINE WIDTHS ==========
+        const SEGMENT_SOLID_WIDTH = 6;
+        const SEGMENT_GLOW_WIDTH = 55;
+        const RPM_SEGMENT_SOLID_WIDTH = 8;
+        const RPM_SEGMENT_GLOW_WIDTH = 100;
+
+        // ========== GAPS (RADIANS) ==========
+        const RPM_SEGMENT_GAP = 0.01;
+        const BOOST_SEGMENT_GAP = 0.02;
+        const HP_SEGMENT_GAP = 0.01;
+        const TQ_SEGMENT_GAP = 0.01;
+
+        // ========== NEEDLE DIMENSIONS ==========
+        const RPM_NEEDLE_LENGTH = 270;
+        const RPM_NEEDLE_BASE_WIDTH = 20;
+        const RPM_NEEDLE_MID_WIDTH = 10;
+        const RPM_NEEDLE_TIP_WIDTH = 6;
+
+        const BOOST_NEEDLE_LENGTH = 30;
+        const BOOST_NEEDLE_BASE_WIDTH = 10;
+        const BOOST_NEEDLE_MID_WIDTH = 6;
+        const BOOST_NEEDLE_TIP_WIDTH = 3;
+
+        const HP_TQ_NEEDLE_LENGTH = 35;
+
+        // ========== EFFECTS ==========
+        const SHADOW_BLUR = 10;
+
+        // ========== FONTS ==========
+        const FONT_RPM_NUMBERS = '45px ForzaFont, Arial';
+        const FONT_LABELS = 'bold 30px ForzaFont, Arial';
+
+        // ========== TEXT OFFSETS ==========
+        const TEXT_OFFSET_RPM = 30;
+        const TEXT_OFFSET_LABELS = 10;
+
+        // ========== BEHAVIOR THRESHOLDS ==========
+        const REDLINE_PERCENT = 0.80;
+        const GEAR_INDICATOR_PERCENT = 0.85;
+        const HP_TQ_COLOR_CHANGE_PERCENT = 0.2;
+
+        // ========== LEARNING DEFAULTS ==========
+        const DEFAULT_MAX_RPM = 10000;
+        const DEFAULT_MAX_BOOST = 5;
+        const DEFAULT_MAX_VACUUM = 2;
+        const DEFAULT_MAX_HP = 5;
+        const DEFAULT_MIN_HP = 5;
+        const DEFAULT_MAX_TQ = 5;
+        const DEFAULT_MIN_TQ = 5;
+
+        // ========== STATE ==========
+        let currentMaxRPM = DEFAULT_MAX_RPM;
+        let cachedGradients = { normal: null, redline: null };
+
+        function createGradients() {
+            const normal = tachCtx.createRadialGradient(
+                TACH_CENTER_X, TACH_CENTER_Y, 246,
+                TACH_CENTER_X, TACH_CENTER_Y, (RPM_OUTER_RADIUS + RPM_INNER_RADIUS) / 1.83
+            );
+            normal.addColorStop(0, COLOR_WHITE_GLOW);
+            normal.addColorStop(1, COLOR_WHITE_GLOW_END);
+
+            const redline = tachCtx.createRadialGradient(
+                TACH_CENTER_X, TACH_CENTER_Y, 246,
+                TACH_CENTER_X, TACH_CENTER_Y, (RPM_OUTER_RADIUS + RPM_INNER_RADIUS) / 1.83
+            );
+            redline.addColorStop(0, COLOR_RED_GLOW);
+            redline.addColorStop(1, COLOR_RED_GLOW_END);
+
+            return { normal, redline };
+        }
+
+        cachedGradients = createGradients();
+
+        let sessionMaxBoost = DEFAULT_MAX_BOOST;
+        let sessionMaxVacuum = DEFAULT_MAX_VACUUM;
+        let sessionMaxHP = DEFAULT_MAX_HP;
+        let sessionMinHP = DEFAULT_MIN_HP;
+        let sessionMaxTQ = DEFAULT_MAX_TQ;
+        let sessionMinTQ = DEFAULT_MIN_TQ;
+        let lastRaceState = 0;
+        let lastMaxRPM = 0;
+
+        // Rev limiter learning
+        let isLearningLimiter = false;
+        let learningPeakRpm = 0;
+        let learningStartGear = 0;
+        let learningAvgSpeed = 0;
+        let learningSpeedSamples = [];
+        let lastPowerSign = 1;
+        let powerFlipCount = 0;
+        let lastPowerFlipTime = 0;
+
+        let lastCarOrdinal = null;
+
+        function drawTachometer(data, redlineRpm) {
+            // Reset gauges on race start
+            if (data.isRaceOn === 1 && lastRaceState === 0) {
+                sessionMaxBoost = DEFAULT_MAX_BOOST;
+                sessionMaxVacuum = DEFAULT_MAX_VACUUM;
+                sessionMaxHP = DEFAULT_MAX_HP;
+                sessionMinHP = DEFAULT_MIN_HP;
+                sessionMaxTQ = DEFAULT_MAX_TQ;
+                sessionMinTQ = DEFAULT_MIN_TQ;
+                console.log('🏁 Race started - gauges reset');
+            }
+            lastRaceState = data.isRaceOn;
+
+            // Reset gauges on car change
+            if (data.carOrdinal !== undefined && data.carOrdinal !== lastCarOrdinal && lastCarOrdinal !== null) {
+                sessionMaxBoost = DEFAULT_MAX_BOOST;
+                sessionMaxVacuum = DEFAULT_MAX_VACUUM;
+                sessionMaxHP = DEFAULT_MAX_HP;
+                sessionMinHP = DEFAULT_MIN_HP;
+                sessionMaxTQ = DEFAULT_MAX_TQ;
+                sessionMinTQ = DEFAULT_MIN_TQ;
+                console.log(`🚗 Car changed (${lastCarOrdinal} -> ${data.carOrdinal}) - gauges reset`);
+            }
+            lastCarOrdinal = data.carOrdinal;
+
+            if (data.maxRpm !== lastMaxRPM && lastMaxRPM !== 0) {
+                sessionMaxBoost = DEFAULT_MAX_BOOST;
+                sessionMaxVacuum = DEFAULT_MAX_VACUUM;
+                sessionMaxHP = DEFAULT_MAX_HP;
+                sessionMinHP = DEFAULT_MIN_HP;
+                sessionMaxTQ = DEFAULT_MAX_TQ;
+                sessionMinTQ = DEFAULT_MIN_TQ;
+                console.log('🔧 MaxRPM changed - gauges reset');
+            }
+            lastMaxRPM = data.maxRpm;
+
+            // Learn max values (not while learning limiter, not while stationary)
+            const isMoving = data.speed > 10;
+            if (!isLearningLimiter && isMoving) {
+                if (data.boost > sessionMaxBoost) sessionMaxBoost = data.boost;
+                if (data.boost < 0 && Math.abs(data.boost) > sessionMaxVacuum) sessionMaxVacuum = Math.abs(data.boost);
+                if (data.power > sessionMaxHP) sessionMaxHP = data.power;
+                if (data.power < 0 && Math.abs(data.power) > sessionMinHP && Math.abs(data.power) < 150) sessionMinHP = Math.abs(data.power);
+                if (data.torque > sessionMaxTQ) sessionMaxTQ = data.torque;
+                if (data.torque < 0 && Math.abs(data.torque) > sessionMinTQ && Math.abs(data.torque) < 150) sessionMinTQ = Math.abs(data.torque);
+            }
+
+            tachCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+            const segments = Math.ceil(currentMaxRPM / 1000);
+            const visualMaxRPM = segments * 1000;
+            const anglePerSegment = TACH_SWEEP / segments;
+
+            // RPM segments
+            for (let i = 0; i < segments; i++) {
+                const startAngle = TACH_START_ANGLE + (i * anglePerSegment) + RPM_SEGMENT_GAP;
+                const endAngle = TACH_START_ANGLE + ((i + 1) * anglePerSegment) - RPM_SEGMENT_GAP;
+                const segmentRpm = (i + 1) * 1000;
+                const isRedline = segmentRpm >= redlineRpm;
+
+                tachCtx.strokeStyle = isRedline ? cachedGradients.redline : cachedGradients.normal;
+                tachCtx.lineWidth = RPM_SEGMENT_GLOW_WIDTH;
+                tachCtx.beginPath();
+                tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, (RPM_OUTER_RADIUS + RPM_INNER_RADIUS) / 2, startAngle, endAngle);
+                tachCtx.stroke();
+
+                tachCtx.strokeStyle = isRedline ? COLOR_RED_SOLID : COLOR_WHITE_SOLID_DIM;
+                tachCtx.lineWidth = RPM_SEGMENT_SOLID_WIDTH;
+                tachCtx.beginPath();
+                tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, RPM_OUTER_RADIUS, startAngle, endAngle);
+                tachCtx.stroke();
+            }
+
+            // RPM numbers
+            for (let i = 0; i <= segments; i++) {
+                const angle = TACH_START_ANGLE + (i * anglePerSegment);
+                const isRedline = i * 1000 >= redlineRpm;
+                tachCtx.fillStyle = isRedline ? COLOR_RED_SOLID : COLOR_WHITE_SOLID;
+                tachCtx.font = FONT_RPM_NUMBERS;
+                tachCtx.textAlign = 'center';
+                tachCtx.textBaseline = 'middle';
+                const textRadius = RPM_OUTER_RADIUS - TEXT_OFFSET_RPM;
+                tachCtx.fillText(i.toString(),
+                    TACH_CENTER_X + textRadius * Math.cos(angle),
+                    TACH_CENTER_Y + textRadius * Math.sin(angle)
+                );
+            }
+
+            // Boost gauge
+            const boostAnglePerSegment = BOOST_SWEEP / BOOST_SEGMENTS;
+            const BOOST_ZERO_ACTUAL = BOOST_MIN_ANGLE + boostAnglePerSegment;
+
+            for (let i = 0; i < BOOST_SEGMENTS; i++) {
+                const segmentCenter = BOOST_MIN_ANGLE + (i * boostAnglePerSegment) + (boostAnglePerSegment / 2);
+                const segStart = Math.max(BOOST_MIN_ANGLE, segmentCenter - boostAnglePerSegment / 2 + BOOST_SEGMENT_GAP);
+                const segEnd = Math.min(BOOST_MAX_ANGLE, segmentCenter + boostAnglePerSegment / 2 - BOOST_SEGMENT_GAP);
+                const isVacuum = (i === 0);
+
+                const segGradient = tachCtx.createRadialGradient(
+                    TACH_CENTER_X, TACH_CENTER_Y, THROTTLE_RADIUS - 20,
+                    TACH_CENTER_X, TACH_CENTER_Y, THROTTLE_RADIUS
+                );
+                if (isVacuum) {
+                    segGradient.addColorStop(0, COLOR_RED_GLOW);
+                    segGradient.addColorStop(1, COLOR_RED_GLOW_END);
+                } else {
+                    segGradient.addColorStop(0, COLOR_WHITE_GLOW);
+                    segGradient.addColorStop(1, COLOR_WHITE_GLOW_END);
+                }
+
+                tachCtx.strokeStyle = segGradient;
+                tachCtx.lineWidth = SEGMENT_GLOW_WIDTH;
+                tachCtx.beginPath();
+                tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, THROTTLE_RADIUS, segStart, segEnd);
+                tachCtx.stroke();
+
+                tachCtx.strokeStyle = isVacuum ? COLOR_RED_SOLID : COLOR_WHITE_SOLID_DIMMER;
+                tachCtx.lineWidth = SEGMENT_SOLID_WIDTH;
+                tachCtx.beginPath();
+                tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, BOOST_OUTER_RADIUS, segStart, segEnd);
+                tachCtx.stroke();
+            }
+
+            // Boost labels
+            tachCtx.font = FONT_LABELS;
+            tachCtx.textAlign = 'center';
+            tachCtx.textBaseline = 'middle';
+            tachCtx.fillStyle = COLOR_WHITE_SOLID_DIM;
+            const minusRadius = THROTTLE_RADIUS - TEXT_OFFSET_LABELS;
+            tachCtx.fillText('−', TACH_CENTER_X + minusRadius * Math.cos(BOOST_MIN_ANGLE), TACH_CENTER_Y + minusRadius * Math.sin(BOOST_MIN_ANGLE));
+            tachCtx.fillText('0', TACH_CENTER_X + minusRadius * Math.cos(BOOST_ZERO_ACTUAL), TACH_CENTER_Y + minusRadius * Math.sin(BOOST_ZERO_ACTUAL));
+            tachCtx.fillText('+', TACH_CENTER_X + minusRadius * Math.cos(BOOST_MAX_ANGLE), TACH_CENTER_Y + minusRadius * Math.sin(BOOST_MAX_ANGLE));
+
+            // Boost needle
+            let boostNeedleAngle;
+            if (data.boost < 0) {
+                const vacuumPercent = Math.min(1, Math.abs(data.boost) / sessionMaxVacuum);
+                boostNeedleAngle = BOOST_ZERO_ACTUAL - (vacuumPercent * boostAnglePerSegment);
+            } else {
+                const boostPercent = Math.min(1, data.boost / sessionMaxBoost);
+                boostNeedleAngle = BOOST_ZERO_ACTUAL + (boostPercent * (BOOST_MAX_ANGLE - BOOST_ZERO_ACTUAL));
+            }
+
+            const boostCos = Math.cos(boostNeedleAngle);
+            const boostSin = Math.sin(boostNeedleAngle);
+            const boostPerpCos = Math.cos(boostNeedleAngle + Math.PI / 2);
+            const boostPerpSin = Math.sin(boostNeedleAngle + Math.PI / 2);
+            const boostNeedleLength = THROTTLE_RADIUS - 10;
+            const boostBase = { x: TACH_CENTER_X, y: TACH_CENTER_Y };
+            const boostMid = { x: TACH_CENTER_X + (boostNeedleLength * 0.7) * boostCos, y: TACH_CENTER_Y + (boostNeedleLength * 0.7) * boostSin };
+            const boostTip = { x: TACH_CENTER_X + boostNeedleLength * boostCos, y: TACH_CENTER_Y + boostNeedleLength * boostSin };
+
+            const isNegativeBoost = data.boost < 0;
+            tachCtx.fillStyle = isNegativeBoost ? COLOR_RED_SOLID_DIMMER : COLOR_WHITE_SOLID_DIM;
+            tachCtx.shadowBlur = SHADOW_BLUR;
+            tachCtx.shadowColor = isNegativeBoost ? COLOR_RED_SHADOW_DIM : COLOR_WHITE_SHADOW_DIM;
+            tachCtx.beginPath();
+            tachCtx.moveTo(boostBase.x + (BOOST_NEEDLE_BASE_WIDTH / 2) * boostPerpCos, boostBase.y + (BOOST_NEEDLE_BASE_WIDTH / 2) * boostPerpSin);
+            tachCtx.lineTo(boostMid.x + (BOOST_NEEDLE_MID_WIDTH / 2) * boostPerpCos, boostMid.y + (BOOST_NEEDLE_MID_WIDTH / 2) * boostPerpSin);
+            tachCtx.lineTo(boostTip.x + (BOOST_NEEDLE_TIP_WIDTH / 2) * boostPerpCos, boostTip.y + (BOOST_NEEDLE_TIP_WIDTH / 2) * boostPerpSin);
+            tachCtx.lineTo(boostTip.x - (BOOST_NEEDLE_TIP_WIDTH / 2) * boostPerpCos, boostTip.y - (BOOST_NEEDLE_TIP_WIDTH / 2) * boostPerpSin);
+            tachCtx.lineTo(boostMid.x - (BOOST_NEEDLE_MID_WIDTH / 2) * boostPerpCos, boostMid.y - (BOOST_NEEDLE_MID_WIDTH / 2) * boostPerpSin);
+            tachCtx.lineTo(boostBase.x - (BOOST_NEEDLE_BASE_WIDTH / 2) * boostPerpCos, boostBase.y - (BOOST_NEEDLE_BASE_WIDTH / 2) * boostPerpSin);
+            tachCtx.closePath();
+            tachCtx.fill();
+            tachCtx.shadowBlur = 0;
+            tachCtx.beginPath();
+            tachCtx.arc(boostTip.x, boostTip.y, BOOST_NEEDLE_TIP_WIDTH / 2, 0, Math.PI * 2);
+            tachCtx.fill();
+
+            // HP Gauge
+            const hpSegments = 5;
+            const hpAnglePerSegment = HP_SWEEP / hpSegments;
+            const hpGapInRadians = HP_SEGMENT_GAP;
+            const HP_ZERO_ANGLE = HP_START_ANGLE + hpAnglePerSegment;
+
+            for (let i = 0; i < hpSegments; i++) {
+                const segmentCenter = HP_START_ANGLE + (i * hpAnglePerSegment) + (hpAnglePerSegment / 2);
+                const segStart = Math.max(HP_START_ANGLE, segmentCenter - hpAnglePerSegment / 2 + hpGapInRadians);
+                const segEnd = Math.min(HP_END_ANGLE, segmentCenter + hpAnglePerSegment / 2 - hpGapInRadians);
+                const isFirstSegment = (i === 0);
+
+                const hpGradient = tachCtx.createRadialGradient(TACH_CENTER_X, TACH_CENTER_Y, HP_RADIUS - 20, TACH_CENTER_X, TACH_CENTER_Y, HP_RADIUS);
+                if (isFirstSegment) { hpGradient.addColorStop(0, COLOR_RED_GLOW); hpGradient.addColorStop(1, COLOR_RED_GLOW_END); }
+                else { hpGradient.addColorStop(0, COLOR_WHITE_GLOW_DIM); hpGradient.addColorStop(1, COLOR_WHITE_GLOW_END); }
+
+                tachCtx.strokeStyle = hpGradient;
+                tachCtx.lineWidth = SEGMENT_GLOW_WIDTH;
+                tachCtx.beginPath();
+                tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, HP_RADIUS, segStart, segEnd);
+                tachCtx.stroke();
+
+                tachCtx.strokeStyle = isFirstSegment ? COLOR_RED_SOLID : COLOR_WHITE_SOLID_DIM;
+                tachCtx.lineWidth = SEGMENT_SOLID_WIDTH;
+                tachCtx.beginPath();
+                tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, HP_RADIUS, segStart, segEnd);
+                tachCtx.stroke();
+            }
+
+            tachCtx.font = FONT_LABELS;
+            tachCtx.textAlign = 'center';
+            tachCtx.textBaseline = 'middle';
+            tachCtx.fillStyle = COLOR_WHITE_SOLID_DIMMER;
+            const hpLabelAngle = HP_ZERO_ANGLE - 0.1;
+            tachCtx.fillText('HP', TACH_CENTER_X + (HP_RADIUS + 30) * Math.cos(hpLabelAngle), TACH_CENTER_Y + (HP_RADIUS + 30) * Math.sin(hpLabelAngle));
+            tachCtx.fillStyle = COLOR_WHITE_SOLID_DIM;
+            tachCtx.fillText('0', TACH_CENTER_X + (HP_RADIUS - 20) * Math.cos(HP_ZERO_ANGLE), TACH_CENTER_Y + (HP_RADIUS - 20) * Math.sin(HP_ZERO_ANGLE));
+
+            // HP needle
+            let hpNeedleAngle;
+            if (data.power < 0) {
+                hpNeedleAngle = HP_ZERO_ANGLE - (Math.min(1, Math.abs(data.power) / sessionMinHP) * hpAnglePerSegment);
+            } else {
+                hpNeedleAngle = HP_ZERO_ANGLE + (Math.min(1, data.power / sessionMaxHP) * (HP_END_ANGLE - HP_ZERO_ANGLE));
+            }
+            const hpInnerRadius = HP_RADIUS - HP_TQ_NEEDLE_LENGTH;
+            const hpOuterRadius = HP_RADIUS + HP_TQ_NEEDLE_LENGTH / 10;
+            const isNegativeHP = data.power < 0;
+            tachCtx.strokeStyle = isNegativeHP ? COLOR_RED_SOLID : COLOR_WHITE_NEEDLE;
+            tachCtx.lineWidth = SEGMENT_SOLID_WIDTH;
+            tachCtx.shadowBlur = SHADOW_BLUR;
+            tachCtx.shadowColor = isNegativeHP ? COLOR_RED_SOLID_DIMMEST : COLOR_WHITE_SOLID_DIMMER;
+            tachCtx.beginPath();
+            tachCtx.moveTo(TACH_CENTER_X + hpInnerRadius * Math.cos(hpNeedleAngle), TACH_CENTER_Y + hpInnerRadius * Math.sin(hpNeedleAngle));
+            tachCtx.lineTo(TACH_CENTER_X + hpOuterRadius * Math.cos(hpNeedleAngle), TACH_CENTER_Y + hpOuterRadius * Math.sin(hpNeedleAngle));
+            tachCtx.stroke();
+            tachCtx.shadowBlur = 0;
+
+            // TQ Gauge
+            const tqSegments = 5;
+            const tqAnglePerSegment = TQ_SWEEP / tqSegments;
+            const tqGapInRadians = HP_SEGMENT_GAP;
+            const TQ_ZERO_ANGLE = TQ_START_ANGLE + tqAnglePerSegment;
+
+            for (let i = 0; i < tqSegments; i++) {
+                const segmentCenter = TQ_START_ANGLE + (i * tqAnglePerSegment) + (tqAnglePerSegment / 2);
+                const segStart = Math.max(TQ_START_ANGLE, segmentCenter - tqAnglePerSegment / 2 + tqGapInRadians);
+                const segEnd = Math.min(TQ_END_ANGLE, segmentCenter + tqAnglePerSegment / 2 - tqGapInRadians);
+                const isFirstSegment = (i === 0);
+
+                const tqGradient = tachCtx.createRadialGradient(TACH_CENTER_X, TACH_CENTER_Y, TQ_RADIUS - 20, TACH_CENTER_X, TACH_CENTER_Y, TQ_RADIUS);
+                if (isFirstSegment) { tqGradient.addColorStop(0, COLOR_RED_GLOW); tqGradient.addColorStop(1, COLOR_RED_GLOW_END); }
+                else { tqGradient.addColorStop(0, COLOR_WHITE_GLOW_DIM); tqGradient.addColorStop(1, COLOR_WHITE_GLOW_END); }
+
+                tachCtx.strokeStyle = tqGradient;
+                tachCtx.lineWidth = SEGMENT_GLOW_WIDTH;
+                tachCtx.beginPath();
+                tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, TQ_RADIUS, segStart, segEnd);
+                tachCtx.stroke();
+
+                tachCtx.strokeStyle = isFirstSegment ? COLOR_RED_SOLID : COLOR_WHITE_SOLID_DIMMER;
+                tachCtx.lineWidth = SEGMENT_SOLID_WIDTH;
+                tachCtx.beginPath();
+                tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, TQ_RADIUS, segStart, segEnd);
+                tachCtx.stroke();
+            }
+
+            tachCtx.font = FONT_LABELS;
+            tachCtx.fillStyle = COLOR_WHITE_SOLID_DIMMER;
+            const tqLabelAngle = TQ_ZERO_ANGLE - 0.13;
+            tachCtx.fillText('TQ', TACH_CENTER_X + (TQ_RADIUS + 20) * Math.cos(tqLabelAngle), TACH_CENTER_Y + (TQ_RADIUS + 20) * Math.sin(tqLabelAngle));
+            tachCtx.fillStyle = COLOR_WHITE_SOLID_DIM;
+            tachCtx.fillText('0', TACH_CENTER_X + (TQ_RADIUS - 20) * Math.cos(TQ_ZERO_ANGLE), TACH_CENTER_Y + (TQ_RADIUS - 20) * Math.sin(TQ_ZERO_ANGLE));
+
+            // TQ needle
+            let tqNeedleAngle;
+            if (data.torque < 0) {
+                tqNeedleAngle = TQ_ZERO_ANGLE - (Math.min(1, Math.abs(data.torque) / sessionMinTQ) * tqAnglePerSegment);
+            } else {
+                tqNeedleAngle = TQ_ZERO_ANGLE + (Math.min(1, data.torque / sessionMaxTQ) * (TQ_END_ANGLE - TQ_ZERO_ANGLE));
+            }
+            const tqInnerRadius = TQ_RADIUS - HP_TQ_NEEDLE_LENGTH;
+            const tqOuterRadius = TQ_RADIUS + HP_TQ_NEEDLE_LENGTH / 10;
+            const isNegativeTQ = data.torque < 0;
+            tachCtx.strokeStyle = isNegativeTQ ? COLOR_RED_SOLID : COLOR_WHITE_NEEDLE;
+            tachCtx.lineWidth = SEGMENT_SOLID_WIDTH;
+            tachCtx.shadowBlur = SHADOW_BLUR;
+            tachCtx.shadowColor = isNegativeTQ ? COLOR_RED_SOLID_DIMMEST : COLOR_WHITE_SOLID_DIMMER;
+            tachCtx.beginPath();
+            tachCtx.moveTo(TACH_CENTER_X + tqInnerRadius * Math.cos(tqNeedleAngle), TACH_CENTER_Y + tqInnerRadius * Math.sin(tqNeedleAngle));
+            tachCtx.lineTo(TACH_CENTER_X + tqOuterRadius * Math.cos(tqNeedleAngle), TACH_CENTER_Y + tqOuterRadius * Math.sin(tqNeedleAngle));
+            tachCtx.stroke();
+            tachCtx.shadowBlur = 0;
+
+            // RPM needle
+            const rpmPercent = data.rpm / visualMaxRPM;
+            const needleAngle = TACH_START_ANGLE + (rpmPercent * TACH_SWEEP);
+            const needleLength = 270;
+            const cos = Math.cos(needleAngle);
+            const sin = Math.sin(needleAngle);
+            const perpCos = Math.cos(needleAngle + Math.PI / 2);
+            const perpSin = Math.sin(needleAngle + Math.PI / 2);
+            const baseWidth = 20, midWidth = 10, tipWidth = 6;
+            const base = { x: TACH_CENTER_X, y: TACH_CENTER_Y };
+            const mid = { x: TACH_CENTER_X + (needleLength * 0.7) * cos, y: TACH_CENTER_Y + (needleLength * 0.7) * sin };
+            const tip = { x: TACH_CENTER_X + needleLength * cos, y: TACH_CENTER_Y + needleLength * sin };
+
+            tachCtx.fillStyle = COLOR_WHITE_SOLID_DIM;
+            tachCtx.shadowBlur = 15;
+            tachCtx.shadowColor = COLOR_WHITE_SHADOW_DIM;
+            tachCtx.beginPath();
+            tachCtx.moveTo(base.x + (baseWidth / 2) * perpCos, base.y + (baseWidth / 2) * perpSin);
+            tachCtx.lineTo(mid.x + (midWidth / 2) * perpCos, mid.y + (midWidth / 2) * perpSin);
+            tachCtx.lineTo(tip.x + (tipWidth / 2) * perpCos, tip.y + (tipWidth / 2) * perpSin);
+            tachCtx.lineTo(tip.x - (tipWidth / 2) * perpCos, tip.y - (tipWidth / 2) * perpSin);
+            tachCtx.lineTo(mid.x - (midWidth / 2) * perpCos, mid.y - (midWidth / 2) * perpSin);
+            tachCtx.lineTo(base.x - (baseWidth / 2) * perpCos, base.y - (baseWidth / 2) * perpSin);
+            tachCtx.closePath();
+            tachCtx.fill();
+            tachCtx.shadowBlur = 0;
+            tachCtx.beginPath();
+            tachCtx.arc(tip.x, tip.y, tipWidth / 2, 0, Math.PI * 2);
+            tachCtx.fill();
+            tachCtx.beginPath();
+            tachCtx.arc(TACH_CENTER_X, TACH_CENTER_Y, 12.5, 0, Math.PI * 2);
+            tachCtx.fill();
+        }
+
+        // ========== WEBSOCKET ==========
+        const ws = new WebSocket('ws://localhost:8765');
+
+        let carDatabase = JSON.parse(localStorage.getItem('forza_car_redlines') || '{}');
+        let currentCarOrdinal = null;
+        let hasLearnedThisSession = new Set();
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const tachContainer = document.querySelector('.tach-container');
+
+            if (data.isRaceOn === 0) {
+                tachContainer.classList.add('hidden');
+                return;
+            }
+            tachContainer.classList.remove('hidden');
+
+            if (data.isRaceOn === 1 && lastRaceState === 0) {
+                hasLearnedThisSession.clear();
+                console.log('🏁 Race started - learning re-enabled');
+            }
+            lastRaceState = data.isRaceOn;
+
+            // Track car changes
+            if (data.carOrdinal !== undefined && data.carOrdinal !== currentCarOrdinal) {
+                currentCarOrdinal = data.carOrdinal;
+                isLearningLimiter = false;
+                learningPeakRpm = 0;
+                powerFlipCount = 0;
+                console.log(`🏎️ Car changed: CarOrdinal ${currentCarOrdinal}`);
+                const carKey = `car_${currentCarOrdinal}`;
+                if (carDatabase[carKey]) {
+                    console.log(`📚 Known limiter: ${carDatabase[carKey].limiter} RPM`);
+                } else {
+                    showNotification("New car detected! 🏎️ Rev it up so I can learn the limiter!", 6000);
+                }
+            }
+
+            const carKey = `car_${currentCarOrdinal}`;
+
+            // Power flip detection for limiter learning
+            const currentPowerSign = data.power >= 0 ? 1 : -1;
+            const powerFlipped = (currentPowerSign !== lastPowerSign) && data.throttle > 0.95 && data.gear > 0;
+            lastPowerSign = currentPowerSign;
+
+            if (powerFlipped && data.rpm > data.maxRpm * 0.7) {
+                const now = Date.now();
+                if (now - lastPowerFlipTime < 3000) { powerFlipCount++; }
+                else { powerFlipCount = 1; }
+                lastPowerFlipTime = now;
+
+                if (powerFlipCount >= 6 && !isLearningLimiter && !hasLearnedThisSession.has(carKey) && data.isRaceOn === 1) {
+                    isLearningLimiter = true;
+                    learningPeakRpm = data.rpm;
+                    learningStartGear = data.gear;
+                    learningAvgSpeed = data.speed;
+                    learningSpeedSamples = [data.speed];
+                    showNotification('🔴 Sustained limiter bounce detected! Learning...');
+                }
+            }
+
+            if (data.throttle < 0.9 || data.rpm < data.maxRpm * 0.7) powerFlipCount = 0;
+
+            // Continue learning
+            if (isLearningLimiter) {
+                if (data.rpm > learningPeakRpm) learningPeakRpm = data.rpm;
+                learningSpeedSamples.push(data.speed);
+                if (learningSpeedSamples.length > 10) learningSpeedSamples.shift();
+                learningAvgSpeed = learningSpeedSamples.reduce((a, b) => a + b) / learningSpeedSamples.length;
+
+                const gearChanged = data.gear !== learningStartGear;
+                const throttleLift = data.throttle < 0.9;
+                const speedDrift = Math.abs(data.speed - learningAvgSpeed) > 10;
+                const rpmDropped = data.rpm < learningPeakRpm - 500;
+
+                if (gearChanged || throttleLift || speedDrift || rpmDropped) {
+                    const detectedLimiter = Math.round(learningPeakRpm);
+                    const existingLimiter = carDatabase[carKey]?.limiter || 0;
+                    const difference = Math.abs(detectedLimiter - existingLimiter);
+
+                    if (!carDatabase[carKey] || difference > 500) {
+                        const redlineRpm = Math.round(detectedLimiter * 0.93);
+                        carDatabase[carKey] = { limiter: detectedLimiter, redline: redlineRpm, maxRpm: data.maxRpm, timestamp: Date.now() };
+                        localStorage.setItem('forza_car_redlines', JSON.stringify(carDatabase));
+                        showNotification(`✅ LEARNED! Car ${currentCarOrdinal}: Limiter ${detectedLimiter} RPM, Redline ${redlineRpm} RPM`);
+                        window.tutOnLimiterLearned?.();
+                    } else {
+                        console.log(`ℹ️ Limiter ${detectedLimiter} matches known value (${existingLimiter})`);
+                    }
+
+                    hasLearnedThisSession.add(carKey);
+                    isLearningLimiter = false;
+                    learningPeakRpm = 0;
+                    powerFlipCount = 0;
+                }
+            }
+
+            const carData = carDatabase[carKey];
+            const redlineRpm = carData ? carData.redline : data.maxRpm * 0.85;
+
+            if (data.maxRpm && data.maxRpm !== currentMaxRPM) currentMaxRPM = data.maxRpm;
+
+            window.tutCheckPhase2?.(data);
+
+            drawTachometer(data, redlineRpm);
+
+            document.getElementById('speedText').textContent = Math.round(convertSpeed(data.speed));
+
+            const gearEl = document.getElementById('gearText');
+            const gearIndicator = document.getElementById('gearIndicator');
+            gearEl.textContent = data.gear === 0 ? 'R' : data.gear.toString();
+
+            const rpmPercent = data.rpm / redlineRpm;
+            gearIndicator.classList.toggle('active', rpmPercent >= 1.0);
+        };
+
+        ws.onerror = () => console.error('WebSocket error');
+
+        // ========== DEMO MODE ==========
+        let demoMode = false;
+        let demoInterval = null;
+        let demoRPM = 0, demoGear = 1, demoDirection = 1;
+
+        function startDemo() {
+            demoRPM = 0; demoGear = 1; demoDirection = 1;
+            demoInterval = setInterval(() => {
+                demoRPM += 100 * demoDirection;
+                if (demoRPM >= 9000) demoDirection = -1;
+                if (demoRPM <= 0) { demoDirection = 1; demoGear = (demoGear % 6) + 1; }
+                const rpmPercent = demoRPM / 9000;
+                const mockData = {
+                    isRaceOn: 1,
+                    rpm: demoRPM, maxRpm: 9000,
+                    speed: rpmPercent * 55.6,
+                    gear: demoGear,
+                    throttle: rpmPercent,
+                    brake: 0,
+                    boost: (rpmPercent - 0.5) * 20,
+                    power: 50 + (rpmPercent * 450),
+                    torque: 100 + (rpmPercent * 400)
+                };
+                drawTachometer(mockData, 5000);
+                document.getElementById('speedText').textContent = Math.round(convertSpeed(mockData.speed));
+                document.getElementById('gearText').textContent = mockData.gear;
+            }, 100);
+        }
+
+        function stopDemo() {
+            clearInterval(demoInterval);
+            demoInterval = null;
+        }
+
+        document.getElementById('demo-btn').addEventListener('click', () => {
+            demoMode = !demoMode;
+            const btn = document.getElementById('demo-btn');
+            if (demoMode) {
+                startDemo();
+                btn.textContent = '🎮 Demo';
+                btn.style.background = 'rgba(234, 31, 84, 0.5)';
+                document.getElementById('titlebar').classList.add('always-visible');
+                showNotification('Demo mode ON 🎮 - gauges are simulated');
+            } else {
+                stopDemo();
+                btn.textContent = '🎮 Demo';
+                btn.style.background = '';
+                if (!tutorialActive) document.getElementById('titlebar').classList.remove('always-visible');
+                showNotification('Demo mode OFF');
+            }
+        });
+    </script>
+
+    <!-- ========== TAURI WINDOW MANAGEMENT ========== -->
+    <script type="module">
+        console.log('🚀 SCRIPT LOADED');
+        const { getCurrentWindow } = window.__TAURI__.window;
+        const appWindow = getCurrentWindow();
+        console.log('✅ Window object:', appWindow);
+
+        window.isLocked = false;
+        window.appWindow = appWindow;
+
+        // Drag
+        document.getElementById('drag-handle').addEventListener('mousedown', async () => {
+            if (!isLocked) {
+                try { await appWindow.startDragging(); }
+                catch (err) { console.error('❌ Drag failed:', err); }
+            }
+        });
+
+        // Lock button
+        const lockBtn = document.getElementById('lock-btn');
+        lockBtn.addEventListener('click', async () => {
+            isLocked = !isLocked;
+            window.isLocked = isLocked;
+            lockBtn.textContent = isLocked ? '🔒' : '🔓';
+            lockBtn.classList.toggle('locked', isLocked);
+            document.body.classList.toggle('unlocked', !isLocked);
+            await appWindow.setResizable(!isLocked);
+            if (isLocked) {
+                await appWindow.setIgnoreCursorEvents(true);
+                showNotification("Window locked! 🔒 Click-through enabled. Ctrl+L to unlock.");
+                await saveWindowState();
+            } else {
+                await appWindow.setIgnoreCursorEvents(false);
+                showNotification("Window unlocked! 🔓 Drag to reposition, window boundaries are visible.");
+            }
+        });
+
+        // Close button
+        document.getElementById('close-btn').addEventListener('click', async () => {
+            await saveWindowState();
+            await appWindow.close();
+        });
+
+        // Hotkeys
+        document.addEventListener('keydown', async (e) => {
+            if (e.ctrlKey && e.key === 'l') { e.preventDefault(); lockBtn.click(); }
+
+            if (e.ctrlKey && e.key === 's') { e.preventDefault(); await saveCustomPosition(); }
+
+            if (e.ctrlKey && e.shiftKey && e.key === 'R') { e.preventDefault(); await restoreCustomPosition(); }
+
+            if (e.ctrlKey && !e.shiftKey && e.key === 'r') {
+                e.preventDefault();
+                const carKey = `car_${currentCarOrdinal}`;
+                hasLearnedThisSession.delete(carKey);
+                powerFlipCount = 0;
+                showNotification("Re-learning mode activated! 🔄 Bounce the limiter.", 4000);
+            }
+
+            if (e.ctrlKey && e.altKey && e.key === 'r') { e.preventDefault(); window.location.reload(); }
+        });
+
+        async function loadWindowState() {
+            try {
+                const { LogicalPosition, LogicalSize, monitorFromPoint } = window.__TAURI__.window;
+                const savedState = localStorage.getItem('forza_hud_window_state');
+                if (savedState) {
+                    const config = JSON.parse(savedState);
+                    const savedMonitor = await monitorFromPoint(config.position.x, config.position.y);
+                    const savedScale = savedMonitor.scaleFactor;
+                    if (config.size) await appWindow.setSize(new LogicalSize(config.size.width / savedScale, config.size.height / savedScale));
+                    if (config.position) await appWindow.setPosition(new LogicalPosition(config.position.x / savedScale, config.position.y / savedScale));
+                    console.log('📂 Window state restored:', config);
+                }
+            } catch (e) { console.error('❌ Failed to load window state:', e); }
+        }
+
+        async function saveWindowState() {
+            try {
+                const { monitorFromPoint } = window.__TAURI__.window;
+                const position = await appWindow.outerPosition();
+                const size = await appWindow.innerSize();
+                const currentMonitor = await monitorFromPoint(position.x, position.y);
+                const config = { position: { x: position.x, y: position.y }, size: { width: size.width, height: size.height } };
+                localStorage.setItem('forza_hud_window_state', JSON.stringify(config));
+                console.log('💾 Saved on', currentMonitor.name || 'Unknown', ':', config);
+            } catch (e) { console.error('Failed to save window state:', e); }
+        }
+
+        async function saveCustomPosition() {
+            try {
+                const position = await appWindow.outerPosition();
+                const size = await appWindow.innerSize();
+                localStorage.setItem('forza_hud_custom_position', JSON.stringify({
+                    position: { x: position.x, y: position.y },
+                    size: { width: size.width, height: size.height }
+                }));
+                showNotification('💾 Custom position saved!');
+            } catch (e) { console.error('Failed to save custom position:', e); }
+        }
+
+        async function restoreCustomPosition() {
+            try {
+                const savedCustom = localStorage.getItem('forza_hud_custom_position');
+                if (savedCustom) {
+                    const config = JSON.parse(savedCustom);
+                    const { LogicalPosition, LogicalSize, monitorFromPoint } = window.__TAURI__.window;
+                    const savedMonitor = await monitorFromPoint(config.position.x, config.position.y);
+                    const savedScale = savedMonitor.scaleFactor;
+                    await appWindow.setSize(new LogicalSize(config.size.width / savedScale, config.size.height / savedScale));
+                    await appWindow.setPosition(new LogicalPosition(config.position.x / savedScale, config.position.y / savedScale));
+                    showNotification('✅ Custom position restored!');
+                    await saveWindowState();
+                } else {
+                    showNotification('⚠️ No custom position saved yet. Use Ctrl+S first.');
+                }
+            } catch (e) { console.error('Failed to restore custom position:', e); }
+        }
+
+        // Auto-save on position changes (debounced)
+        let saveTimeout;
+        setInterval(async () => {
+            if (!isLocked) {
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(saveWindowState, 1000);
+            }
+        }, 2000);
+
+        loadWindowState();
+
+        // Resolution preset - called by tutorial
+        window.applyResolutionPreset = async function() {
+            try {
+                const { LogicalSize, LogicalPosition, currentMonitor } = window.__TAURI__.window;
+                const monitor = await currentMonitor();
+                const physH = monitor.size.height;
+                const scale = monitor.scaleFactor;
+
+                let w, h, x, y;
+                if (physH >= 2000)      { w = 718; h = 859; x = 3033; y = 1205; } // 4K
+                else if (physH >= 1400) { w = 479; h = 573; x = 2022; y =  803; } // 1440p
+                else                    { w = 359; h = 430; x = 1517; y =  602; } // 1080p
+
+                await appWindow.setSize(new LogicalSize(w / scale, h / scale));
+                await appWindow.setPosition(new LogicalPosition(x / scale, y / scale));
+                await saveWindowState();
+                console.log(`📐 Preset applied: ${w}×${h} @ ${x},${y} (monitor ${physH}px tall, scale ${scale})`);
+            } catch(e) { console.error('❌ Preset failed:', e); }
+        };
+    </script>
+
+    <!-- ========== UI & NOTIFICATIONS ========== -->
+    <script>
+        // Scale
+        function updateScale() {
+            const scaleX = window.innerWidth / 750;
+            const scaleY = window.innerHeight / 900;
+            const scale = Math.min(scaleX, scaleY, 1);
+            document.documentElement.style.setProperty('--hud-scale', scale);
+        }
+        window.addEventListener('resize', updateScale);
+        updateScale();
+
+        // Info modal
+        const modal = document.getElementById('info-modal');
+        const infoBtn = document.getElementById('info-btn');
+        const closeModal = document.getElementById('close-modal');
+        infoBtn.addEventListener('click', () => modal.style.display = 'block');
+        closeModal.addEventListener('click', () => modal.style.display = 'none');
+        window.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+        // Sync toggle button status text on load
+        document.getElementById('notif-status').textContent = localStorage.getItem('forza_hud_notifications_enabled') !== 'false' ? 'ON' : 'OFF';
+
+        // ========== SPEED UNITS ==========
+        let useMetric = localStorage.getItem('forza_hud_speed_unit') !== 'imperial';
+
+        function convertSpeed(ms) {
+            return useMetric ? ms * 3.6 : ms * 2.23694;
+        }
+
+        function applySpeedUnit() {
+            const label = useMetric ? 'KM/H' : 'MPH';
+            document.getElementById('speedUnit').textContent = label;
+            document.getElementById('unit-btn').textContent  = label;
+        }
+
+        document.getElementById('unit-btn').addEventListener('click', () => {
+            useMetric = !useMetric;
+            localStorage.setItem('forza_hud_speed_unit', useMetric ? 'metric' : 'imperial');
+            applySpeedUnit();
+            showNotification(`Speed units: ${useMetric ? 'KM/H 🇪🇺' : 'MPH 🇺🇸'}`);
+        });
+
+        applySpeedUnit(); // apply saved preference on load
+
+        // ========== TUTORIAL ENGINE ==========
+        const TUT_DONE_KEY  = 'forza_hud_tutorial_done';
+        const TUT_PHASE_KEY = 'forza_hud_tutorial_phase';
+
+        let tutorialActive    = false;
+        let tutPhase2Pending  = false;
+
+        const isTutDone  = () => localStorage.getItem(TUT_DONE_KEY)  === 'true';
+        const getTutPhase = () => localStorage.getItem(TUT_PHASE_KEY) || null;
+        const setTutPhase = (p) => p === null
+            ? localStorage.removeItem(TUT_PHASE_KEY)
+            : localStorage.setItem(TUT_PHASE_KEY, p);
+        const markTutDone = () => { localStorage.setItem(TUT_DONE_KEY, 'true'); setTutPhase(null); };
+
+        // ── Panel helpers ────────────────────────────────────────────────
+        function showTutPanel(message, buttons) {
+            const panel  = document.getElementById('tutorial-panel');
+            const btnDiv = document.getElementById('tut-buttons');
+            document.getElementById('tut-message').textContent = message;
+            btnDiv.innerHTML = '';
+            for (const b of buttons) {
+                const btn = document.createElement('button');
+                btn.className = 'tut-btn' + (b.primary ? ' primary' : '');
+                btn.textContent = b.label;
+                btn.onclick = b.action;
+                btnDiv.appendChild(btn);
+            }
+            panel.style.display = 'flex';
+        }
+
+        function hideTutPanel() {
+            document.getElementById('tutorial-panel').style.display = 'none';
+        }
+
+        function tutWiggleAndClose(callback) {
+            const panel = document.getElementById('tutorial-panel');
+            panel.classList.add('tut-wiggle');
+            setTimeout(() => {
+                panel.classList.remove('tut-wiggle');
+                hideTutPanel();
+                tutorialActive = false;
+                setButtonHighlight(null);
+                // Restore titlebar to hover-only unless demo is still running
+                if (!demoMode) document.getElementById('titlebar').classList.remove('always-visible');
+                if (callback) callback();
+            }, 650);
+        }
+
+        function setButtonHighlight(id) {
+            ['info-btn', 'demo-btn', 'unit-btn', 'lock-btn'].forEach(bid =>
+                document.getElementById(bid)?.classList.remove('tb-highlight')
+            );
+            if (id) document.getElementById(id)?.classList.add('tb-highlight');
+        }
+
+        const hideHud = () => document.querySelector('.tach-container').classList.add('tut-hidden');
+        const showHud = () => document.querySelector('.tach-container').classList.remove('tut-hidden');
+
+        // ── Phase 1 steps ────────────────────────────────────────────────
+        function buildPhase1(next) {
+            return [
+                // 0 - welcome, activate demo
+                () => {
+                    hideHud();
+                    showTutPanel(
+                        "Hey! Welcome to the Forza Horizon 5 Custom HUD! This is the first time the you're running this app, let me fire up Demo Mode while I get you up to speed.",
+                        [{ label: "Ok! ", primary: true, action: () => {
+                            if (!demoMode) document.getElementById('demo-btn').click();
+                            next(1);
+                        }}]
+                    );
+                },
+                // 1 - reassurance
+                () => showTutPanel(
+                    "Don't worry, this setup only happens once. After this you'll go straight into the HUD every time you open the app.",
+                    [{ label: "Good to know", primary: true, action: () => {
+                        showHud();
+                        next(2)
+                    }}]
+                ),
+                // 2 - apply preset
+                async () => {
+                    // showTutPanel("Let me size the app to fit your screen...", []);
+                    if (window.applyResolutionPreset) await window.applyResolutionPreset();
+                    showTutPanel(
+                        "Here, I went ahead and sized the app for your screen. You can always drag and resize it to wherever feels right for you though, so don't be afraid to play around with it.",
+                        [{ label: "Nice! ", primary: true, action: () => next(3) }]
+                    );
+                },
+                // 3 - intro to controls
+                () => showTutPanel(
+                    "You'll see on that there are several buttons on the title bar at the top of the app. Let me walk you through each one.",
+                    [{ label: "Show me", primary: true, action: () => next(4) }]
+                ),
+                // 4 - info button
+                () => {
+                    setButtonHighlight('info-btn');
+                    showTutPanel(
+                        "ℹ️ The Info button has all the hotkeys and controls for the app, as well as some important info if you're a streamer, alongside some personal notes from the author of the app. Worth a read once we're done here.",
+                        [{ label: "Got it", primary: true, action: () => next(5) }]
+                    );
+                },
+                // 5 - demo button
+                () => {
+                    setButtonHighlight('demo-btn');
+                    showTutPanel(
+                        "🎮 Demo Mode simulates the gauges so you can see the HUD without the game running. This is helpful in case you have a screenshot of the game, so you can display it on full screen and use it as a template to align the hud correctly. Make sure this is off when you're actually playing.",
+                        [{ label: "Makes sense", primary: true, action: () => next(6) }]
+                    );
+                },
+                // 6 - unit toggle
+                () => {
+                    setButtonHighlight('unit-btn');
+                    showTutPanel(
+                        "This button toggles between KM/H and MPH, originally I made this only with KM/H, but since this is a public release, figured some racers out there use MPH. Your preference is saved automatically.",
+                        [{ label: "Got it", primary: true, action: () => next(7) }]
+                    );
+                },
+                // 7 - lock button pt 1
+                () => {
+                    setButtonHighlight('lock-btn');
+                    showTutPanel(
+                        "🔓 The Lock button, once you're happy with the HUD's position, click on this button to lock the app in position. The border disappears and the window becomes click-through, so you can play as if the HUD isn't there.",
+                        [{ label: "Ok", primary: true, action: () => next(8) }]
+                    );
+                },
+                // 8 - lock button pt 2
+                () => showTutPanel(
+                    "Fair warning though: once locked you can't interact with the HUD directly. In order to unlock it, you have to click the app in your taskbar and press Ctrl+L.",
+                    [{ label: "Understood", primary: true, action: () => { setButtonHighlight(null); next(9); } }]
+                ),
+                // 9 - open the game
+                () => {
+                    if (demoMode) document.getElementById('demo-btn').click();
+                    showTutPanel(
+                        "Before we can use the HUD, we have a couple settings to do on the game first, so let's get Forza Horizon 5 set up. Go ahead and open the game for me, then hit Ok when you're ready.",
+                        [{ label: "Ok, Game is open", primary: true, action: () => next(10) }]
+                    );
+                },
+                // 10 - data out
+                () => showTutPanel(
+                    "Head over to 'Settings' → 'HUD and Gameplay', find the 'Data Out' option and toggle it ON.",
+                    [{ label: "Done", primary: true, action: () => next(11) }]
+                ),
+                // 11 - IP and port
+                () => showTutPanel(
+                    "Just below that, set 'Data Out IP Address' to 127.0.0.1 and 'Data Out IP Port' to 5300. Don't worry this connection stays local on your PC, it's how the HUD reads Forza's telemetry output, otherwise, the app will stay static all the time.",
+                    [{ label: "All set", primary: true, action: () => next(12) }]
+                ),
+                // 12 - in-game speedometer
+                () => showTutPanel(
+                    "Lastly: find the 'Speedometer' setting and turn it off, so you're not running two HUDs at the same time.",
+                    [{ label: "Done", primary: true, action: () => next(13) }]
+                ),
+                // 13 - fork
+                () => showTutPanel(
+                    "And that's pretty much it, you're all set! Now, want me to pop back in once you're on the road to show you how the rev limiter learning works? It's 'mostly' a cosmetic part, but it is important since every car has a different red line and rev ranges, so it is worth a look I'd say.",
+                    [
+                        { label: "Sure, show me", primary: true, action: () => {
+                            setTutPhase('drive');
+                            tutWiggleAndClose(() => showNotification("Great! see you on the road!", 5000));
+                        }},
+                        { label: "I'm good, thanks", action: () => {
+                            markTutDone();
+                            tutWiggleAndClose(() => showNotification("Great! Have fun racing!", 4000));
+                        }}
+                    ]
+                ),
+            ];
+        }
+
+        function runPhase1() {
+            tutorialActive = true;
+            document.getElementById('titlebar').classList.add('always-visible');
+            const steps = buildPhase1((i) => steps[i]());
+            steps[0]();
+        }
+
+        // ── Phase 2 ──────────────────────────────────────────────────────
+        function runPhase2() {
+            tutorialActive = true;
+            document.getElementById('titlebar').classList.add('always-visible');
+            tutPhase2Pending = false;
+            showTutPanel(
+                "Hey, it is good to see you on the road! Lets show you how to teach the HUD the rev limiter of the car, it is very encouraged to use at least Manual transmission, otherwise Forza will shift for you, unfortunately making this part of the tutorial a bit of a moot point",
+                [{ label: "OK", primary: true, action: () => {
+                    showTutPanel("Now, go ahead and put the car in first gear and give your it a good pull, let it bounce off the rev limiter for a couple of seconds, then let go of the throttle - I'm listening...", []);
+                    window.tutWaitingForLimiter = true;
+                }}]
+            );
+        }
+
+        function onLimiterLearned() {
+            if (!window.tutWaitingForLimiter) return;
+            window.tutWaitingForLimiter = false;
+            showTutPanel(
+                "Got it! The HUD now knows exactly where the redline sits for this car. It remembers every car you drive, so you only need to do this once per car, or in case you changed tune, you can click the app on the task bar and use Ctrl + R to let it know it has to learn the new rev range, the exercise is the same, just let the engine hit the rev limiter while it's moving and that's it.",
+                [{ label: "Nice!", primary: true, action: () => {
+                    showTutPanel(
+                        "The HP, Torque and Boost gauges also react to each car, this is done automatically for the most part, it works best when teaching the rev limiter of each car too, so all values are set right away. Afterwards you can race no problem. One last tip: this removes guessing the powerband of your car, specially on some engine swaps, like that one Subaru that has all the torque at around 4k rpm but immediately falls off after, I personally keep a close eye on the Torque gauge, when you see it starting to drop near or into the third white segment, so about 75% or less peak power, it'd be a good time to shift up to stay in the powerband.",
+                        [{ label: "Got it, thanks!", primary: true, action: () => {
+                            markTutDone();
+                            tutWiggleAndClose(() => showNotification("That's all for now, have fun racing!", 4000));
+                        }}]
+                    );
+                }}]
+            );
+        }
+
+        // ── Phase 2 re-entry (app closed before driving) ─────────────────
+        function runPhase2Reentry() {
+            tutorialActive = true;
+            document.getElementById('titlebar').classList.add('always-visible');
+            showTutPanel(
+                "Hey! The app closed before we got to the fun part. Want me to walk you through the rev limiter, or are you good from here?",
+                [
+                    { label: "Show me", primary: true, action: runPhase2 },
+                    { label: "I'm good",  action: () => {
+                        markTutDone();
+                        tutWiggleAndClose();
+                    }}
+                ]
+            );
+        }
+
+        // ── Global hooks (called from other script blocks) ────────────────
+        window.tutCheckPhase2 = (data) => {
+            if (isTutDone() || getTutPhase() !== 'drive') return;
+            if (tutorialActive || tutPhase2Pending) return;
+            if (data.isRaceOn !== 1) return;
+            tutPhase2Pending = true;
+            setTimeout(runPhase2, 2000);
+        };
+
+        window.tutOnLimiterLearned = onLimiterLearned;
+
+        // ── Boot ──────────────────────────────────────────────────────────
+        function initTutorial() {
+            if (isTutDone()) return;
+            const phase = getTutPhase();
+            if (!phase)           runPhase1();
+            else if (phase === 'drive') runPhase2Reentry();
+        }
+
+        window.replayTutorial = function() {
+            document.getElementById('info-modal').style.display = 'none';
+            localStorage.removeItem(TUT_DONE_KEY);
+            localStorage.removeItem(TUT_PHASE_KEY);
+            runPhase1();
+        };
+
+        initTutorial();
+
+        // ========== NOTIFICATIONS ==========
+        let notificationsEnabled = localStorage.getItem('forza_hud_notifications_enabled') !== 'false';
+        let notificationTimeout;
+        let lastNotificationTime = 0;
+
+        function showNotification(message, duration = 5000) {
+            if (!notificationsEnabled || tutorialActive) return;
+            const bubble = document.getElementById('notification-bubble');
+            const bubbleText = document.getElementById('bubble-text');
+            const now = Date.now();
+            if (now - lastNotificationTime < 500) {
+                clearTimeout(notificationTimeout);
+                notificationTimeout = setTimeout(() => showNotification(message, duration), 600);
+                return;
+            }
+            lastNotificationTime = now;
+            bubbleText.textContent = message;
+            bubble.classList.add('show');
+            clearTimeout(notificationTimeout);
+            notificationTimeout = setTimeout(() => bubble.classList.remove('show'), duration);
+        }
+
+        document.getElementById('bubble-close').addEventListener('click', () => {
+            document.getElementById('notification-bubble').classList.remove('show');
+            clearTimeout(notificationTimeout);
+        });
+
+        function toggleNotifications() {
+            notificationsEnabled = !notificationsEnabled;
+            localStorage.setItem('forza_hud_notifications_enabled', notificationsEnabled);
+            document.getElementById('notif-status').textContent = notificationsEnabled ? 'ON' : 'OFF';
+            document.getElementById('info-modal').style.display = 'none';
+            const prev = notificationsEnabled;
+            notificationsEnabled = true;
+            showNotification(prev ? '🔔 Notifications enabled' : '🔕 Notifications disabled');
+            notificationsEnabled = prev;
+        }
+
+    </script>
+</body>
+
+</html>
