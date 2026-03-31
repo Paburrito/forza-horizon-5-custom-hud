@@ -42,10 +42,17 @@ jobs:
           releaseBody: |
             ## Forza Horizon 5 - Custom HUD ${{ github.ref_name }}
 
-            Download the `.exe` below and run it — no installation needed.
+            **Two download options below:**
+            - `...-setup.exe` — installer, sets up a Start Menu entry and uninstaller
+            - `Forza-Horizon-5-Custom-HUD-By-Paburrito.exe` — standalone, just run it, no install needed
 
             **Setup:** In Forza Horizon 5 go to Settings → HUD and Gameplay, enable Data Out, set IP to `127.0.0.1` and port to `5300`.
 
             See the [README](https://github.com/${{ github.repository }}#readme) for full instructions.
           releaseDraft: false
           prerelease: false
+
+      - name: Upload standalone exe
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/Forza-Horizon-5-Custom-HUD-By-Paburrito.exe
